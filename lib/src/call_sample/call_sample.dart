@@ -8,6 +8,7 @@ class CallSample extends StatefulWidget {
 
   final String host;
 
+
   CallSample({Key key, @required this.host}) : super(key: key);
 
   @override
@@ -18,11 +19,10 @@ class _CallSampleState extends State<CallSample> {
   Signaling _signaling;
   List<dynamic> _peers;
   var _selfId;
-  RTCVideoRenderer _localRenderer = RTCVideoRenderer();
-  RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+  var renders = <RTCVideoRenderer>[];
   bool _inCalling = false;
   Session _session;
-
+  final int cameraCount = 31;
   // ignore: unused_element
   _CallSampleState({Key key});
 
@@ -34,16 +34,32 @@ class _CallSampleState extends State<CallSample> {
   }
 
   initRenderers() async {
-    await _localRenderer.initialize();
-    await _remoteRenderer.initialize();
+    for (var i = 0; i < cameraCount; i++) {
+      try {
+        print('initialized - ${i - 1}');
+        var renderer = RTCVideoRenderer();
+        await renderer.initialize();
+        renders.add(renderer);
+      } catch (e) {
+        print('exception -$e - $i');
+        break;
+      }
+    }
   }
 
   @override
   deactivate() {
     super.deactivate();
     if (_signaling != null) _signaling.close();
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
+    for (var i in renders) {
+      try {
+       i.dispose();
+
+      } catch (e) {
+        print('exception -$e - $i');
+        break;
+      }
+    }
   }
 
   void _connect() async {
@@ -69,8 +85,9 @@ class _CallSampleState extends State<CallSample> {
             break;
           case CallState.CallStateBye:
             setState(() {
-              _localRenderer.srcObject = null;
-              _remoteRenderer.srcObject = null;
+              for(var item in renders){
+                item.srcObject = null;
+              }
               _inCalling = false;
               _session = null;
             });
@@ -89,15 +106,15 @@ class _CallSampleState extends State<CallSample> {
       });
 
       _signaling.onLocalStream = ((_, stream) {
-        _localRenderer.srcObject = stream;
+        for(var render in renders){
+          render.srcObject = stream;
+        }
       });
 
       _signaling.onAddRemoteStream = ((_, stream) {
-        _remoteRenderer.srcObject = stream;
       });
 
       _signaling.onRemoveRemoteStream = ((_, stream) {
-        _remoteRenderer.srcObject = null;
       });
     }
   }
@@ -189,35 +206,13 @@ class _CallSampleState extends State<CallSample> {
                   ]))
           : null,
       body: _inCalling
-          ? OrientationBuilder(builder: (context, orientation) {
-              return Container(
-                child: Stack(children: <Widget>[
-                  Positioned(
-                      left: 0.0,
-                      right: 0.0,
-                      top: 0.0,
-                      bottom: 0.0,
-                      child: Container(
-                        margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
-                        width: MediaQuery.of(context).size.width,
-                        height: MediaQuery.of(context).size.height,
-                        child: RTCVideoView(_remoteRenderer),
-                        decoration: BoxDecoration(color: Colors.black54),
-                      )),
-                  Positioned(
-                    left: 20.0,
-                    top: 20.0,
-                    child: Container(
-                      width: orientation == Orientation.portrait ? 90.0 : 120.0,
-                      height:
-                          orientation == Orientation.portrait ? 120.0 : 90.0,
-                      child: RTCVideoView(_localRenderer, mirror: true),
-                      decoration: BoxDecoration(color: Colors.black54),
-                    ),
-                  ),
-                ]),
-              );
-            })
+          ? GridView.count(shrinkWrap: true,
+        crossAxisCount: 6,
+        children: [
+          // RTCVideoView(_remoteRenderer),RTCVideoView(_localRenderer),
+          for (var i=0;i<renders.length;i++) Stack(children: [RTCVideoView(renders[i]),Center(child: Text('$i'))])
+        ],
+      )
           : ListView.builder(
               shrinkWrap: true,
               padding: const EdgeInsets.all(0.0),
