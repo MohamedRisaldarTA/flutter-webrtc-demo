@@ -22,24 +22,29 @@ class _CallSampleState extends State<CallSample> {
   var renders = <RTCVideoRenderer>[];
   bool _inCalling = false;
   Session _session;
-  final int cameraCount = 31;
+  final int cameraCount = 40;
   // ignore: unused_element
   _CallSampleState({Key key});
 
   @override
   initState() {
     super.initState();
-    initRenderers();
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      initRenderers();
+    });
     _connect();
   }
 
   initRenderers() async {
     for (var i = 0; i < cameraCount; i++) {
       try {
-        print('initialized - ${i - 1}');
+
         var renderer = RTCVideoRenderer();
-        await renderer.initialize();
-        renders.add(renderer);
+        await renderer.initialize().then((value) {
+          print('initialized - $i');
+          renders.add(renderer);
+        });
+
       } catch (e) {
         print('exception -$e - $i');
         break;
